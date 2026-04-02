@@ -1,7 +1,7 @@
 // src/api.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const API_BASE = "https://orderhai-be.vercel.app";
+export const API_BASE = "http://192.168.1.13:5003";
 
 // ---------- Core request helper ----------
 
@@ -72,6 +72,7 @@ export interface ApiUser {
   id: string;
   phone: string;
   name?: string;
+  role?: string;
   lastLoginAt?: string;
   addresses?: ApiAddress[];
 }
@@ -350,4 +351,253 @@ export const apiCreateQuickAddress = (params: {
     method: "POST",
     auth: true,
     body,
+  });
+
+// ---------- Subscriptions ----------
+
+export const apiCreateSubscription = (data: {
+  productId: string;
+  variantName?: string;
+  qty: number;
+  frequency: "daily" | "weekly" | "custom";
+  daysOfWeek?: number[];
+  addressId: string;
+  startDate: string;
+}) =>
+  request("/api/subscriptions", {
+    method: "POST",
+    auth: true,
+    body: data,
+  });
+
+export const apiGetSubscriptions = () =>
+  request("/api/subscriptions", { auth: true });
+
+export const apiUpdateSubscription = (
+  id: string,
+  data: {
+    qty?: number;
+    frequency?: "daily" | "weekly" | "custom";
+    daysOfWeek?: number[];
+    addressId?: string;
+  }
+) =>
+  request(`/api/subscriptions/${id}`, {
+    method: "PUT",
+    auth: true,
+    body: data,
+  });
+
+export const apiPauseSubscription = (id: string, pausedUntil: string) =>
+  request(`/api/subscriptions/${id}/pause`, {
+    method: "POST",
+    auth: true,
+    body: { pausedUntil },
+  });
+
+export const apiResumeSubscription = (id: string) =>
+  request(`/api/subscriptions/${id}/resume`, {
+    method: "POST",
+    auth: true,
+  });
+
+export const apiCancelSubscription = (id: string) =>
+  request(`/api/subscriptions/${id}`, {
+    method: "DELETE",
+    auth: true,
+  });
+
+// ---------- Coupons ----------
+
+export const apiValidateCoupon = (code: string, cartTotal: number) =>
+  request<{ valid: boolean; discount: number; message?: string }>(
+    "/api/coupons/validate",
+    {
+      method: "POST",
+      auth: true,
+      body: { code, cartTotal },
+    }
+  );
+
+// ---------- Wallet & Referral ----------
+
+export const apiGetWallet = () =>
+  request("/api/wallet", { auth: true });
+
+export const apiGetReferralCode = () =>
+  request<{ code: string }>("/api/referral", { auth: true });
+
+export const apiApplyReferral = (code: string) =>
+  request("/api/referral/apply", {
+    method: "POST",
+    auth: true,
+    body: { code },
+  });
+
+// ---------- Complaints ----------
+
+export const apiCreateComplaint = (data: {
+  orderId: string;
+  type: string;
+  description: string;
+  images?: string[];
+}) =>
+  request("/api/complaints", {
+    method: "POST",
+    auth: true,
+    body: data,
+  });
+
+export const apiGetMyComplaints = () =>
+  request("/api/complaints", { auth: true });
+
+// ---------- Delivery Boy ----------
+
+export const apiGetTodayAssignments = () =>
+  request("/api/delivery/assignments/today", { auth: true });
+
+export const apiStartAssignment = (id: string) =>
+  request(`/api/delivery/assignments/${id}/start`, {
+    method: "POST",
+    auth: true,
+  });
+
+export const apiUpdateDeliveryStatus = (
+  orderId: string,
+  status: string
+) =>
+  request(`/api/delivery/orders/${orderId}/status`, {
+    method: "PATCH",
+    auth: true,
+    body: { status },
+  });
+
+export const apiConfirmDelivery = (orderId: string, otp: string) =>
+  request(`/api/delivery/orders/${orderId}/confirm`, {
+    method: "POST",
+    auth: true,
+    body: { otp },
+  });
+
+export const apiUpdateLocation = (lat: number, lng: number) =>
+  request("/api/delivery/location", {
+    method: "POST",
+    auth: true,
+    body: { lat, lng },
+  });
+
+export const apiGetEarnings = () =>
+  request("/api/delivery/earnings", { auth: true });
+
+export const apiGetEarningsHistory = () =>
+  request("/api/delivery/earnings/history", { auth: true });
+
+export const apiGetSettlements = () =>
+  request("/api/delivery/settlements", { auth: true });
+
+export const apiRequestLeave = (date: string, reason: string) =>
+  request("/api/delivery/leave", {
+    method: "POST",
+    auth: true,
+    body: { date, reason },
+  });
+
+export const apiGetLeaveRequests = () =>
+  request("/api/delivery/leave", { auth: true });
+
+export const apiToggleAvailability = (isAvailable: boolean) =>
+  request("/api/delivery/availability", {
+    method: "POST",
+    auth: true,
+    body: { isAvailable },
+  });
+
+// ---------- Distributor ----------
+
+export const apiGetDistributorProfile = () =>
+  request("/api/distributor/profile", { auth: true });
+
+export const apiUpdateDistributorProfile = (data: {
+  businessName?: string;
+  gstin?: string;
+  name?: string;
+}) =>
+  request("/api/distributor/profile", {
+    method: "PUT",
+    auth: true,
+    body: data,
+  });
+
+export const apiGetB2BProducts = (search?: string, category?: string) => {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (category) params.append("category", category);
+  const qs = params.toString();
+  return request(`/api/distributor/products${qs ? `?${qs}` : ""}`, {
+    auth: true,
+  });
+};
+
+export const apiCreateB2BOrder = (data: {
+  items: { product: string; qty: number; variant?: string }[];
+  address?: string;
+  notes?: string;
+}) =>
+  request("/api/distributor/orders", {
+    method: "POST",
+    auth: true,
+    body: data,
+  });
+
+export const apiGetDistributorOrders = () =>
+  request("/api/distributor/orders", { auth: true });
+
+export const apiGetDistributorInvoices = () =>
+  request("/api/distributor/invoices", { auth: true });
+
+export const apiGetCreditSummary = () =>
+  request("/api/distributor/credit-summary", { auth: true });
+
+export const apiRecordCreditPayment = (amount: number, razorpay_payment_id: string) =>
+  request("/api/distributor/credit-payment", {
+    method: "POST",
+    auth: true,
+    body: { amount, razorpay_payment_id },
+  });
+
+export const apiGetAssignedOrders = (status?: string) => {
+  const qs = status ? `?status=${status}` : "";
+  return request(`/api/distributor/assigned-orders${qs}`, { auth: true });
+};
+
+export const apiUpdateAssignedOrderStatus = (orderId: string, status: string) =>
+  request(`/api/distributor/assigned-orders/${orderId}/status`, {
+    method: "PATCH",
+    auth: true,
+    body: { status },
+  });
+
+// ---------- Delivery Slots ----------
+
+export const apiGetAvailableSlots = (zone: string) =>
+  request(`/api/slots?zone=${encodeURIComponent(zone)}`, { auth: true });
+
+// ---------- Payment ----------
+
+export const apiCreatePaymentOrder = (amount: number, receipt: string) =>
+  request("/api/payments/create-order", {
+    method: "POST",
+    auth: true,
+    body: { amount, receipt },
+  });
+
+export const apiVerifyPayment = (data: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}) =>
+  request("/api/payments/verify", {
+    method: "POST",
+    auth: true,
+    body: data,
   });

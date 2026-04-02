@@ -1,14 +1,14 @@
-// Blinkit-inspired green color theme
+// Nandani dairy blue color theme
 export const colors = {
-  primary: "#0c831f",
-  primaryDark: "#0a6b19",
-  primaryLight: "#e8f5e9",
+  primary: "#1a5276",
+  primaryDark: "#154360",
+  primaryLight: "#d6eaf8",
 
-  secondary: "#f0f9f1",
-  secondaryDark: "#d4e8d6",
+  secondary: "#eaf2f8",
+  secondaryDark: "#aed6f1",
 
-  accent: "#ffd700",
-  accentDark: "#ffb700",
+  accent: "#f39c12",
+  accentDark: "#d68910",
 
   background: "#ffffff",
   surface: "#ffffff",

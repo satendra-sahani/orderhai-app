@@ -19,18 +19,22 @@ import {
 
 type Location = { address: string };
 
+export type UserRole = "customer" | "delivery_boy" | "distributor" | "admin";
+
 export type AppUser = {
   id: string;
   name: string;
   phoneNumber: string;
   location: Location;
   _id?: string;
+  role: UserRole;
 };
 
 type UserContextType = {
   user: AppUser | null;
   isLoggedIn: boolean;
-  setUser: (user: AppUser | null) => void;
+  role: UserRole;
+  setUser: (user: AppUser | null) => Promise<void> | void;
   favourites: string[];
   toggleFavourite: (productId: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -60,6 +64,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           id: me.id,
           name: me.name || "",
           phoneNumber: me.phone,
+          role: (me.role as UserRole) || "customer",
           location: {
             address:
               defaultAddress?.line1 ??
@@ -73,15 +78,31 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         );
         setFavourites(ids);
       } catch {
-        // silent: token may be invalid
+        // API failed — try restoring demo user from AsyncStorage
+        const storedUser = await AsyncStorage.getItem("user");
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (parsed.role) {
+              setUserState(parsed);
+            }
+          } catch {
+            // corrupted stored user, ignore
+          }
+        }
       }
     };
 
     load();
   }, []);
 
-  const setUser = (u: AppUser | null) => {
+  const setUser = async (u: AppUser | null) => {
     setUserState(u);
+    if (u) {
+      await AsyncStorage.setItem("user", JSON.stringify(u));
+    } else {
+      await AsyncStorage.removeItem("user");
+    }
   };
 
   const toggleFavourite = async (productId: string) => {
@@ -121,6 +142,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const value: UserContextType = {
     user,
     isLoggedIn: !!user,
+    role: user?.role || "customer",
     setUser,
     favourites,
     toggleFavourite,

@@ -217,6 +217,34 @@ export const OrdersScreen = ({ navigation }: any) => {
               )}
             </TouchableOpacity>
           )}
+
+          {/* Track Order button */}
+          {item.status !== "CANCELLED" && item.status !== "DELIVERED" && (
+            <TouchableOpacity
+              style={styles.trackButton}
+              onPress={() =>
+                navigation.navigate("OrderTracking", { order: item })
+              }
+            >
+              <Icon name="locate" size={16} color={colors.primary} />
+              <Text style={styles.trackButtonText}>Track Order</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Report Issue button for delivered orders */}
+          {item.status === "DELIVERED" && (
+            <TouchableOpacity
+              style={styles.reportButton}
+              onPress={() =>
+                navigation.navigate("Complaint", {
+                  orderId: item.orderId || id,
+                })
+              }
+            >
+              <Icon name="flag" size={16} color={colors.warning} />
+              <Text style={styles.reportButtonText}>Report Issue</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -413,6 +441,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: colors.error,
+  },
+  trackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  trackButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  reportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  reportButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.warning,
   },
   emptyContainer: {
     flex: 1,

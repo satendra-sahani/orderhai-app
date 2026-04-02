@@ -20,9 +20,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Geolocation from "react-native-geolocation-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { Image } from "react-native";
 import { Icon } from "../components/Icon";
 import { colors } from "../theme/colors";
-import { useUser } from "../context/UserContext";
+import { useUser, type AppUser, type UserRole } from "../context/UserContext";
 import {
   apiSendLoginOtp,
   apiVerifyLoginOtp,
@@ -133,10 +134,12 @@ export const LoginScreen = ({ navigation }: any) => {
         me.addresses.find((a: any) => a.isDefault) ||
         me.addresses[0];
 
-      const appUser = {
+      const userRole = u.role || "customer";
+      const appUser: AppUser = {
         id: u.id,
         name: u.name ?? "",
         phoneNumber: u.phone || `+91${phone}`,
+        role: userRole,
         location: {
           address: defaultAddr?.line1 || "",
           city: defaultAddr?.city || "",
@@ -144,7 +147,7 @@ export const LoginScreen = ({ navigation }: any) => {
       };
 
       setUser(appUser);
-      navigation.replace("Home");
+      // RoleBasedNavigator auto-switches based on isLoggedIn + role
     } else if (!hasName) {
       // user has no name → go to name step
       setStep("details");
@@ -228,33 +231,41 @@ export const LoginScreen = ({ navigation }: any) => {
     if (!finalLocation) return;
 
     setIsLoading(true);
-    await saveAddressOnServer(finalLocation);
-
-    // fetch latest user (with name/address) from server
-    let apiUser: any = null;
     try {
-      apiUser = await apiGetMe();
-    } catch {
-      // fallback to local
-      const local = await AsyncStorage.getItem("user");
-      apiUser = local ? JSON.parse(local) : null;
-    }
-    setIsLoading(false);
+      await saveAddressOnServer(finalLocation);
 
-    const newUser = {
-      id: apiUser?.id || Date.now().toString(),
-      name: apiUser?.name || name.trim(),
-      phoneNumber:
-        apiUser?.phone || `+91${phoneNumber}`,
-      location: {
-        address:
-          apiUser?.addresses?.find(
-            (a: any) => a.isDefault
-          )?.line1 || finalLocation,
-      },
-    };
-    setUser(newUser);
-    navigation.replace("Home");
+      // fetch latest user (with name/address) from server
+      let apiUser: any = null;
+      try {
+        apiUser = await apiGetMe();
+      } catch {
+        // fallback to local
+        const local = await AsyncStorage.getItem("user");
+        apiUser = local ? JSON.parse(local) : null;
+      }
+
+      const userRole = apiUser?.role || "customer";
+      const newUser: AppUser = {
+        id: apiUser?.id || Date.now().toString(),
+        name: apiUser?.name || name.trim(),
+        phoneNumber:
+          apiUser?.phone || `+91${phoneNumber}`,
+        role: userRole,
+        location: {
+          address:
+            apiUser?.addresses?.find(
+              (a: any) => a.isDefault
+            )?.line1 || finalLocation,
+        },
+      };
+      await setUser(newUser);
+      // RoleBasedNavigator auto-switches based on isLoggedIn + role
+    } catch (e) {
+      console.error("Complete setup error:", e);
+      setAuthError("Setup failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ---------- Location ----------
@@ -340,19 +351,47 @@ export const LoginScreen = ({ navigation }: any) => {
     );
   };
 
+  // ---------- Demo Login ----------
+
+  const handleDemoLogin = async (demoRole: 'admin' | 'distributor') => {
+    const demoUsers: Record<string, AppUser> = {
+      admin: {
+        id: 'demo-admin-001',
+        name: 'Nandini Admin',
+        phoneNumber: '9999900000',
+        role: 'admin' as UserRole,
+        location: { address: 'KMF Head Office, Bengaluru' },
+      },
+      distributor: {
+        id: 'demo-dist-001',
+        name: 'Rajesh Distributor',
+        phoneNumber: '9999900001',
+        role: 'distributor' as UserRole,
+        location: { address: 'Jayanagar, Bengaluru' },
+      },
+    };
+    const demoUser = demoUsers[demoRole];
+    await AsyncStorage.setItem('token', 'demo-token');
+    await AsyncStorage.setItem('user', JSON.stringify(demoUser));
+    setUser(demoUser);
+  };
+
   // ---------- UI ----------
 
   const renderPhoneStep = () => (
     <>
       <View style={styles.brandSection}>
-        <Text style={styles.brandName}>one</Text>
-        <Text style={styles.brandTagline}>Mobile App</Text>
-        <Text style={styles.brandDescription}>
-          Unlimited Convenience
-        </Text>
+        <View style={styles.brandLogoRow}>
+          <Image
+            source={{ uri: "https://www.kmfnandini.coop/_next/static/media/logo.00aae0f8.png" }}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={styles.brandName}>Nandini</Text>
+        <Text style={styles.brandTagline}>Karnataka's Own Dairy Brand</Text>
         <Text style={styles.brandSubtext}>
-          Zeato, your all-in-one solution for seamless
-          dining{"\n"}and grocery experiences.
+          Farm-fresh dairy products delivered{"\n"}to your doorstep daily.
         </Text>
       </View>
 
@@ -361,7 +400,7 @@ export const LoginScreen = ({ navigation }: any) => {
           Welcome! Ready to Order?
         </Text>
         <Text style={styles.welcomeSubtitle}>
-          Log in or Sign up
+          Log in or Sign up with your phone number
         </Text>
 
         <View style={styles.inputContainer}>
@@ -400,6 +439,48 @@ export const LoginScreen = ({ navigation }: any) => {
             </Text>
           )}
         </TouchableOpacity>
+
+        {/* Demo Account Section */}
+        <View style={styles.demoSection}>
+          <View style={styles.demoDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.demoDividerText}>Demo Accounts</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Demo credentials info */}
+          <View style={styles.demoCredBox}>
+            <View style={styles.demoCredRow}>
+              <View style={[styles.demoCredDot, { backgroundColor: colors.accent }]} />
+              <Text style={styles.demoCredLabel}>Admin</Text>
+              <Text style={styles.demoCredValue}>999 990 0000</Text>
+            </View>
+            <View style={styles.demoCredRow}>
+              <View style={[styles.demoCredDot, { backgroundColor: colors.primary }]} />
+              <Text style={styles.demoCredLabel}>Distributor</Text>
+              <Text style={styles.demoCredValue}>999 990 0001</Text>
+            </View>
+            <Text style={styles.demoCredHint}>Tap below for instant login — no OTP needed</Text>
+          </View>
+
+          <View style={styles.demoButtonRow}>
+            <TouchableOpacity
+              style={styles.demoButtonAdmin}
+              onPress={() => handleDemoLogin('admin')}
+            >
+              <Icon name="shield-checkmark" size={18} color={colors.white} />
+              <Text style={styles.demoButtonTextWhite}>Admin Demo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.demoButtonDistributor}
+              onPress={() => handleDemoLogin('distributor')}
+            >
+              <Icon name="business" size={18} color={colors.primary} />
+              <Text style={styles.demoButtonTextPrimary}>Distributor Demo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <Text style={styles.termsText}>
           By clicking, I accept the{" "}
@@ -773,9 +854,11 @@ export const LoginScreen = ({ navigation }: any) => {
       >
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>Z</Text>
-            </View>
+            <Image
+              source={{ uri: "https://www.kmfnandini.coop/_next/static/media/corpo-logo.e8b2acaf.jpg" }}
+              style={styles.corpoLogo}
+              resizeMode="contain"
+            />
           </View>
         </View>
 
@@ -792,20 +875,12 @@ export const LoginScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primary },
-  header: { paddingHorizontal: 16, paddingVertical: 20 },
+  header: { paddingHorizontal: 16, paddingVertical: 16 },
   logoContainer: { alignItems: "flex-end" },
-  logo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: colors.primary,
+  corpoLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
   },
   backButton: {
     position: "absolute",
@@ -818,24 +893,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   content: { flex: 1, justifyContent: "space-between" },
-  brandSection: { paddingHorizontal: 32, paddingTop: 40 },
+  brandSection: { paddingHorizontal: 32, paddingTop: 20 },
+  brandLogoRow: {
+    marginBottom: 12,
+  },
+  brandLogo: {
+    width: 72,
+    height: 72,
+  },
   brandName: {
-    fontSize: 72,
+    fontSize: 42,
     fontWeight: "900",
     color: colors.white,
-    marginBottom: 8,
+    marginBottom: 4,
+    letterSpacing: 1,
   },
   brandTagline: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
-    color: colors.white,
-    marginBottom: 4,
-  },
-  brandDescription: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: colors.white,
-    marginBottom: 16,
+    color: "#F39C12",
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
   brandSubtext: {
     fontSize: 12,
@@ -1083,6 +1161,99 @@ const styles = StyleSheet.create({
   checkboxText: {
     fontSize: 13,
     color: colors.text,
+  },
+  // Demo account styles
+  demoSection: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  demoCredBox: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#eef0f2",
+  },
+  demoCredRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  demoCredDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  demoCredLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    width: 75,
+  },
+  demoCredValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: 0.8,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  demoCredHint: {
+    fontSize: 10,
+    color: colors.textLight,
+    marginTop: 4,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  demoDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 10,
+  },
+  demoDividerText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.textLight,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  demoButtonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  demoButtonAdmin: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.accent,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  demoButtonDistributor: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  demoButtonTextWhite: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.white,
+  },
+  demoButtonTextPrimary: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primary,
   },
 });
 

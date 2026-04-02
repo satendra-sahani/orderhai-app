@@ -43,9 +43,10 @@ export const ProductCard = ({
   return (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.9}
+      activeOpacity={0.92}
       onPress={onPress}
     >
+      {/* Image area */}
       <View style={styles.imageContainer}>
         {!!product.image && (
           <Image
@@ -54,7 +55,7 @@ export const ProductCard = ({
           />
         )}
 
-        {/* veg / non-veg */}
+        {/* veg / non-veg indicator */}
         <View style={styles.vegIndicatorContainer}>
           <View
             style={[
@@ -68,120 +69,94 @@ export const ProductCard = ({
           </View>
         </View>
 
-        {/* discount */}
+        {/* discount badge */}
         {product.sponsor && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>
               {product.sponsor.discountPercent}%
             </Text>
+            <Text style={styles.discountOff}>OFF</Text>
           </View>
         )}
 
         {/* favourite */}
         <TouchableOpacity
-          style={styles.favButton}
+          style={[styles.favButton, isFavourite && styles.favButtonActive]}
           onPress={onToggleFavourite}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Icon
             name={isFavourite ? "heart" : "heart-outline"}
-            size={16}
-            color={isFavourite ? "#FF4B4B" : colors.white}
+            size={14}
+            color={isFavourite ? "#FF4B4B" : "#999"}
           />
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
+        {/* Rating row */}
+        {product.rating && (
+          <View style={styles.ratingContainer}>
+            <Icon name="star" size={10} color="#F39C12" />
+            <Text style={styles.ratingText}>
+              {product.rating.toFixed(1)}
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
+
         {product.unit && (
           <Text style={styles.unit}>{product.unit}</Text>
         )}
 
+        {/* Price + Cart controls */}
         <View style={styles.priceRow}>
-          <View style={styles.priceLine}>
+          <View style={styles.priceColumn}>
             <Text style={styles.price}>₹{discountedPrice}</Text>
             {product.sponsor && (
               <Text style={styles.originalPrice}>₹{basePrice}</Text>
             )}
           </View>
 
-          {/* cart control: + / - / count */}
+          {/* Cart stepper */}
           {cartQty > 0 ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: colors.primary,
-                overflow: "hidden",
-              }}
-            >
+            <View style={styles.cartStepper}>
               <TouchableOpacity
-                style={styles.addIconButton}
+                style={styles.stepperBtn}
                 onPress={onDecrease}
               >
-                <Icon
-                  name="remove"
-                  size={16}
-                  color={colors.white}
-                />
+                <Icon name="remove" size={14} color={colors.white} />
               </TouchableOpacity>
-              <Text
-                style={{
-                  paddingHorizontal: 8,
-                  fontSize: 12,
-                  fontWeight: "700",
-                  color: colors.text,
-                }}
-              >
-                {cartQty}
-              </Text>
+              <Text style={styles.stepperQty}>{cartQty}</Text>
               <TouchableOpacity
-                style={styles.addIconButton}
+                style={styles.stepperBtn}
                 onPress={onIncrease}
               >
-                <Icon
-                  name="add"
-                  size={16}
-                  color={colors.white}
-                />
+                <Icon name="add" size={14} color={colors.white} />
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.addIconButton}
+              style={styles.addButton}
               onPress={onAddToCart}
             >
-              <Icon
-                name="add"
-                size={16}
-                color={colors.white}
-              />
+              <Icon name="add" size={14} color={colors.primary} />
+              <Text style={styles.addButtonText}>ADD</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        <View style={styles.ratingContainer}>
-          <Icon name="star" size={12} color="#FFC107" />
-          <Text style={styles.ratingText}>
-            {product.rating?.toFixed(1) || "4.5"}
-          </Text>
-        </View>
-
+        {/* Order Now CTA */}
         <TouchableOpacity
           style={styles.orderButton}
           onPress={onOrderNow}
+          activeOpacity={0.85}
         >
-          <Text style={styles.orderButtonText}>
-            Order Now
-          </Text>
-          <Icon
-            name="arrow-forward"
-            size={12}
-            color={colors.white}
-          />
+          <Text style={styles.orderButtonText}>Order Now</Text>
+          <Icon name="arrow-forward" size={11} color={colors.white} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -189,28 +164,31 @@ export const ProductCard = ({
 };
 
 const styles = StyleSheet.create({
-  // keep all your existing styles block unchanged
   card: {
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     marginHorizontal: 4,
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: colors.black,
+    marginBottom: 10,
+    elevation: 3,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     flex: 1,
     maxWidth: "48%",
   },
   imageContainer: {
     width: "100%",
-    aspectRatio: 1.1,
-    backgroundColor: "#f5f5f5",
+    aspectRatio: 1.15,
+    backgroundColor: "#fafbfc",
     position: "relative",
   },
-  image: { width: "100%", height: "100%", resizeMode: "cover" },
+  image: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
   vegIndicatorContainer: {
     position: "absolute",
     top: 8,
@@ -243,33 +221,60 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: colors.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
     alignItems: "center",
-    justifyContent: "center",
   },
   discountText: {
     color: colors.white,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
+    lineHeight: 12,
+  },
+  discountOff: {
+    color: colors.white,
+    fontSize: 7,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   favButton: {
     position: "absolute",
     bottom: 8,
     right: 8,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
   },
-  content: { padding: 8 },
+  favButtonActive: {
+    backgroundColor: "#FFF0F0",
+  },
+  content: {
+    padding: 10,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 4,
+  },
+  ratingText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#F39C12",
+  },
   name: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.text,
     marginBottom: 2,
     lineHeight: 16,
@@ -277,62 +282,80 @@ const styles = StyleSheet.create({
   unit: {
     fontSize: 10,
     color: colors.textLight,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  priceLine: {
+  priceColumn: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     gap: 4,
-    marginBottom: 2,
-    flex: 1,
   },
   price: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "900",
     color: colors.text,
   },
   originalPrice: {
-    fontSize: 10,
-    color: "#999",
+    fontSize: 11,
+    color: "#bbb",
     textDecorationLine: "line-through",
   },
-  ratingContainer: {
+  // Cart stepper (when item in cart)
+  cartStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: colors.primary,
+  },
+  stepperBtn: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperQty: {
+    paddingHorizontal: 8,
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.white,
+  },
+  // Add button (when not in cart)
+  addButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  ratingText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.textSecondary,
+  addButtonText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.primary,
+    letterSpacing: 0.5,
   },
-  addIconButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
+  // Order Now button
   orderButton: {
-    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     borderRadius: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
     backgroundColor: colors.primary,
   },
   orderButtonText: {
     fontSize: 11,
     fontWeight: "800",
     color: colors.white,
+    letterSpacing: 0.3,
   },
 });

@@ -18,6 +18,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useUser } from "../context/UserContext";
 import { colors } from "../theme/colors";
+import { apiValidateCoupon, apiCreatePaymentOrder, apiVerifyPayment } from "../api";
+import RazorpayCheckout from "react-native-razorpay";
 
 type ConfirmAddress = {
   line1: string;
@@ -50,6 +52,10 @@ export const CartScreen = ({ navigation }: any) => {
   const [showCouponInput, setShowCouponInput] =
     useState(false);
 
+  const [deliverySlot, setDeliverySlot] = useState<
+    "morning" | "afternoon" | "evening"
+  >("morning");
+
   const [isLoading, setIsLoading] =
     useState(false);
 
@@ -74,7 +80,7 @@ export const CartScreen = ({ navigation }: any) => {
     return `${item.quantity} pcs`;
   };
 
-  const applyCouponHandler = () => {
+  const applyCouponHandler = async () => {
     const code = couponCode.trim();
     if (!code) {
       setDiscountError("Please enter a coupon code.");
@@ -83,41 +89,55 @@ export const CartScreen = ({ navigation }: any) => {
       return;
     }
 
-    let percent = 0;
-    switch (code) {
-      case "Barkha":
-        percent = 10;
-        break;
-      case "Kavita":
-        percent = 12;
-        break;
-      case "Babita":
-        percent = 15;
-        break;
-      case "anuj":
-        percent = 15;
-        break;
-      case "Sundeep":
-        percent = 20;
-        break;
-      case "SundeepLoveSaniya":
-        percent = 98;
-        break;
-      case "Saniya":
-        percent = 80;
-        break;
-      default:
-        percent = 0;
-    }
+    try {
+      const result = await apiValidateCoupon(code, getItemTotal());
+      if (result.valid && result.discount > 0) {
+        setDiscountError(null);
+        setAppliedCoupon(code);
+        setDiscountPercent(result.discount);
+      } else {
+        setDiscountError(result.message || "Invalid coupon code.");
+        setAppliedCoupon(null);
+        setDiscountPercent(0);
+      }
+    } catch (err: any) {
+      // Fallback to local validation
+      let percent = 0;
+      switch (code) {
+        case "Barkha":
+          percent = 10;
+          break;
+        case "Kavita":
+          percent = 12;
+          break;
+        case "Babita":
+          percent = 15;
+          break;
+        case "anuj":
+          percent = 15;
+          break;
+        case "Sundeep":
+          percent = 20;
+          break;
+        case "SundeepLoveSaniya":
+          percent = 98;
+          break;
+        case "Saniya":
+          percent = 80;
+          break;
+        default:
+          percent = 0;
+      }
 
-    if (percent === 0) {
-      setDiscountError("Invalid coupon code.");
-      setAppliedCoupon(null);
-      setDiscountPercent(0);
-    } else {
-      setDiscountError(null);
-      setAppliedCoupon(code);
-      setDiscountPercent(percent);
+      if (percent === 0) {
+        setDiscountError("Invalid coupon code.");
+        setAppliedCoupon(null);
+        setDiscountPercent(0);
+      } else {
+        setDiscountError(null);
+        setAppliedCoupon(code);
+        setDiscountPercent(percent);
+      }
     }
   };
 
@@ -150,32 +170,90 @@ export const CartScreen = ({ navigation }: any) => {
           const phone = user.phoneNumber;
           const name = user.name || "Customer";
 
-          const order = await placeOrder({
-            address: addressText,
-            phone,
-            name,
-            paymentMethod,
-          });
-
-          setIsLoading(false);
-
-          if (!order) {
-            Alert.alert(
-              "Order failed",
-              "Unable to place order. Please try again."
+          if (paymentMethod === "ONLINE") {
+            // 1. Create Razorpay order first
+            const rzpOrder = await apiCreatePaymentOrder(
+              total,
+              `receipt_${Date.now()}`
             );
-            return;
-          }
 
-          // Navigate to success
-          navigation.replace("OrderSuccess", {
-            orderId:
-              (order as any).orderId ||
-              (order as any).id ||
-              (order as any)._id,
-            total: total.toFixed(2),
-            paymentMethod,
-          });
+            // 2. Open Razorpay checkout
+            const options = {
+              description: "Order Payment",
+              image: "",
+              currency: "INR",
+              key: "rzp_test_MMGuj3e4zdYV1A",
+              amount: rzpOrder.amount, // already in paise from backend
+              name: "Nandani",
+              order_id: rzpOrder.order_id,
+              prefill: {
+                contact: phone,
+                name: name,
+              },
+              theme: { color: colors.primary },
+            };
+
+            let paymentData: any;
+            try {
+              paymentData = await RazorpayCheckout.open(options);
+            } catch (rzpErr: any) {
+              setIsLoading(false);
+              Alert.alert(
+                "Payment Cancelled",
+                rzpErr?.description || "Payment was cancelled."
+              );
+              return;
+            }
+
+            // 3. Verify payment
+            await apiVerifyPayment({
+              razorpay_order_id: paymentData.razorpay_order_id,
+              razorpay_payment_id: paymentData.razorpay_payment_id,
+              razorpay_signature: paymentData.razorpay_signature,
+            });
+
+            // 4. Place the order after payment verified
+            const order = await placeOrder({
+              address: addressText,
+              phone,
+              name,
+              paymentMethod,
+            });
+
+            setIsLoading(false);
+
+            if (!order) {
+              Alert.alert("Order failed", "Payment succeeded but order creation failed. Contact support.");
+              return;
+            }
+
+            navigation.replace("OrderSuccess", {
+              orderId: (order as any).orderId || (order as any).id || (order as any)._id,
+              total: total.toFixed(2),
+              paymentMethod,
+            });
+          } else {
+            // COD flow — place order directly
+            const order = await placeOrder({
+              address: addressText,
+              phone,
+              name,
+              paymentMethod,
+            });
+
+            setIsLoading(false);
+
+            if (!order) {
+              Alert.alert("Order failed", "Unable to place order. Please try again.");
+              return;
+            }
+
+            navigation.replace("OrderSuccess", {
+              orderId: (order as any).orderId || (order as any).id || (order as any)._id,
+              total: total.toFixed(2),
+              paymentMethod,
+            });
+          }
         } catch (err: any) {
           setIsLoading(false);
           Alert.alert(
@@ -389,6 +467,56 @@ export const CartScreen = ({ navigation }: any) => {
                 >
                   Delivery in 30-40 mins
                 </Text>
+              </View>
+            </View>
+
+            {/* Delivery Slot */}
+            <View style={styles.itemsSection}>
+              <Text style={styles.sectionTitle}>
+                Delivery Slot
+              </Text>
+              <View style={styles.slotRow}>
+                {(
+                  [
+                    { key: "morning", label: "Morning", time: "6-9 AM", icon: "sunny" },
+                    { key: "afternoon", label: "Afternoon", time: "12-3 PM", icon: "partly-sunny" },
+                    { key: "evening", label: "Evening", time: "5-8 PM", icon: "moon" },
+                  ] as const
+                ).map((slot) => (
+                  <TouchableOpacity
+                    key={slot.key}
+                    style={[
+                      styles.slotCard,
+                      deliverySlot === slot.key &&
+                        styles.slotCardSelected,
+                    ]}
+                    onPress={() =>
+                      setDeliverySlot(slot.key)
+                    }
+                  >
+                    <Icon
+                      name={slot.icon}
+                      size={20}
+                      color={
+                        deliverySlot === slot.key
+                          ? colors.primary
+                          : colors.textLight
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.slotCardLabel,
+                        deliverySlot === slot.key &&
+                          styles.slotCardLabelSelected,
+                      ]}
+                    >
+                      {slot.label}
+                    </Text>
+                    <Text style={styles.slotCardTime}>
+                      {slot.time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
 
@@ -962,5 +1090,35 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: colors.white,
+  },
+  slotRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  slotCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    gap: 4,
+  },
+  slotCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  slotCardLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  slotCardLabelSelected: {
+    color: colors.primary,
+    fontWeight: "700",
+  },
+  slotCardTime: {
+    fontSize: 10,
+    color: colors.textLight,
   },
 });

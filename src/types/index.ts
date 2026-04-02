@@ -23,6 +23,7 @@ export interface Product {
   sponsor?: Sponsor
   unit?: string // Added unit field for kg, pcs, etc
   originalPrice?: number // Added originalPrice for discounted items
+  isSubscribable?: boolean // Whether product supports daily/weekly subscription
 }
 
 export interface CartItem {
